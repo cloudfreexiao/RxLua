@@ -10,29 +10,27 @@ function Observable:takeLast(count)
         error("Expected a number")
     end
 
-    return Observable.create(
-        function(observer)
-            local buffer = {}
+    return Observable.create(function(observer)
+        local buffer = {}
 
-            local function onNext(...)
-                table.insert(buffer, util.pack(...))
-                if #buffer > count then
-                    table.remove(buffer, 1)
-                end
+        local function onNext(...)
+            table.insert(buffer, util.pack(...))
+            if #buffer > count then
+                table.remove(buffer, 1)
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                for i = 1, #buffer do
-                    observer:onNext(util.unpack(buffer[i]))
-                end
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            for i = 1, #buffer do
+                observer:onNext(util.unpack(buffer[i]))
+            end
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end

@@ -21,11 +21,9 @@ function TimeoutScheduler:schedule(action, delay, ...)
     local _ = self
     local timer = require "rx.timer"
     local handle = timer.setTimeout(delay, action, ...)
-    return Subscription.create(
-        function()
-            timer.clearTimeout(handle)
-        end
-    )
+    return Subscription.create(function()
+        timer.clearTimeout(handle)
+    end)
 end
 
 return TimeoutScheduler

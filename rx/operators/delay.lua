@@ -10,36 +10,28 @@ local util = require "rx.util"
 function Observable:delay(time, scheduler)
     time = type(time) ~= "function" and util.constant(time) or time
 
-    return Observable.create(
-        function(observer)
-            local actions = {}
+    return Observable.create(function(observer)
+        local actions = {}
 
-            local function delay(key)
-                return function(...)
-                    local arg = util.pack(...)
-                    local handle =
-                        scheduler:schedule(
-                        function()
-                            observer[key](observer, util.unpack(arg))
-                        end,
-                        time()
-                    )
-                    table.insert(actions, handle)
-                end
+        local function delay(key)
+            return function(...)
+                local arg = util.pack(...)
+                local handle = scheduler:schedule(function()
+                    observer[key](observer, util.unpack(arg))
+                end, time())
+                table.insert(actions, handle)
             end
-
-            local subscription = self:subscribe(delay("onNext"), delay("onError"), delay("onCompleted"))
-
-            return Subscription.create(
-                function()
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                    for i = 1, #actions do
-                        actions[i]:unsubscribe()
-                    end
-                end
-            )
         end
-    )
+
+        local subscription = self:subscribe(delay("onNext"), delay("onError"), delay("onCompleted"))
+
+        return Subscription.create(function()
+            if subscription then
+                subscription:unsubscribe()
+            end
+            for i = 1, #actions do
+                actions[i]:unsubscribe()
+            end
+        end)
+    end)
 end

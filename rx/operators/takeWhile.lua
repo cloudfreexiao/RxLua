@@ -7,42 +7,36 @@ local util = require "rx.util"
 function Observable:takeWhile(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local taking = true
-            local subscription
+    return Observable.create(function(observer)
+        local taking = true
+        local subscription
 
-            local function onNext(...)
+        local function onNext(...)
+            if taking then
+                util.tryWithObserver(observer, function(...)
+                    taking = predicate(...)
+                end, ...)
+
                 if taking then
-                    util.tryWithObserver(
-                        observer,
-                        function(...)
-                            taking = predicate(...)
-                        end,
-                        ...
-                    )
-
-                    if taking then
-                        return observer:onNext(...)
-                    else
-                        if subscription then
-                            subscription:unsubscribe()
-                        end
-                        return observer:onCompleted()
+                    return observer:onNext(...)
+                else
+                    if subscription then
+                        subscription:unsubscribe()
                     end
+                    return observer:onCompleted()
                 end
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end

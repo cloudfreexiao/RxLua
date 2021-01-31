@@ -7,36 +7,30 @@ local util = require "rx.util"
 function Observable:find(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local subscription
+    return Observable.create(function(observer)
+        local subscription
 
-            local function onNext(...)
-                util.tryWithObserver(
-                    observer,
-                    function(...)
-                        if predicate(...) then
-                            observer:onNext(...)
-                            if subscription then
-                                subscription:unsubscribe()
-                            end
-                            return observer:onCompleted()
-                        end
-                    end,
-                    ...
-                )
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
+        local function onNext(...)
+            util.tryWithObserver(observer, function(...)
+                if predicate(...) then
+                    observer:onNext(...)
+                    if subscription then
+                        subscription:unsubscribe()
+                    end
+                    return observer:onCompleted()
+                end
+            end, ...)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end

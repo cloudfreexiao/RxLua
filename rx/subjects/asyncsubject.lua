@@ -20,7 +20,7 @@ function AsyncSubject.create()
         observers = {},
         stopped = false,
         value = nil,
-        errorMessage = nil
+        errorMessage = nil,
     }
 
     return setmetatable(self, AsyncSubject)
@@ -51,16 +51,14 @@ function AsyncSubject:subscribe(onNext, onError, onCompleted)
 
     table.insert(self.observers, observer)
 
-    return Subscription.create(
-        function()
-            for i = 1, #self.observers do
-                if self.observers[i] == observer then
-                    table.remove(self.observers, i)
-                    return
-                end
+    return Subscription.create(function()
+        for i = 1, #self.observers do
+            if self.observers[i] == observer then
+                table.remove(self.observers, i)
+                return
             end
         end
-    )
+    end)
 end
 
 --- Pushes zero or more values to the AsyncSubject.

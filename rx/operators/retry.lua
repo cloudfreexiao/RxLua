@@ -5,33 +5,31 @@ local Observable = require "rx.observable"
 --                        number of retries will be attempted.
 -- @returns {Observable}
 function Observable:retry(count)
-    return Observable.create(
-        function(observer)
-            local subscription
-            local retries = 0
+    return Observable.create(function(observer)
+        local subscription
+        local retries = 0
 
-            local function onNext(...)
-                return observer:onNext(...)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            local function onError(message)
-                if subscription then
-                    subscription:unsubscribe()
-                end
-
-                retries = retries + 1
-                if count and retries > count then
-                    return observer:onError(message)
-                end
-
-                subscription = self:subscribe(onNext, onError, onCompleted)
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(...)
+            return observer:onNext(...)
         end
-    )
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        local function onError(message)
+            if subscription then
+                subscription:unsubscribe()
+            end
+
+            retries = retries + 1
+            if count and retries > count then
+                return observer:onError(message)
+            end
+
+            subscription = self:subscribe(onNext, onError, onCompleted)
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end

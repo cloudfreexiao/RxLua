@@ -10,43 +10,41 @@ local util = require "rx.util"
 function Observable:with(...)
     local sources = {...}
 
-    return Observable.create(
-        function(observer)
-            local latest = setmetatable({}, {__len = util.constant(#sources)})
-            local subscriptions = {}
+    return Observable.create(function(observer)
+        local latest = setmetatable({}, {
+            __len = util.constant(#sources),
+        })
+        local subscriptions = {}
 
-            local function setLatest(i)
-                return function(value)
-                    latest[i] = value
-                end
+        local function setLatest(i)
+            return function(value)
+                latest[i] = value
             end
-
-            local function onNext(value)
-                return observer:onNext(value, util.unpack(latest))
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            for i = 1, #sources do
-                subscriptions[i] = sources[i]:subscribe(setLatest(i), util.noop, util.noop)
-            end
-
-            subscriptions[#sources + 1] = self:subscribe(onNext, onError, onCompleted)
-            return Subscription.create(
-                function()
-                    for i = 1, #sources + 1 do
-                        if subscriptions[i] then
-                            subscriptions[i]:unsubscribe()
-                        end
-                    end
-                end
-            )
         end
-    )
+
+        local function onNext(value)
+            return observer:onNext(value, util.unpack(latest))
+        end
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        for i = 1, #sources do
+            subscriptions[i] = sources[i]:subscribe(setLatest(i), util.noop, util.noop)
+        end
+
+        subscriptions[#sources + 1] = self:subscribe(onNext, onError, onCompleted)
+        return Subscription.create(function()
+            for i = 1, #sources + 1 do
+                if subscriptions[i] then
+                    subscriptions[i]:unsubscribe()
+                end
+            end
+        end)
+    end)
 end

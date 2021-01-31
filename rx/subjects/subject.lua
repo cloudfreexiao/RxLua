@@ -16,7 +16,7 @@ Subject.__tostring = util.constant("Subject")
 function Subject.create()
     local self = {
         observers = {},
-        stopped = false
+        stopped = false,
     }
 
     return setmetatable(self, Subject)
@@ -38,16 +38,14 @@ function Subject:subscribe(onNext, onError, onCompleted)
 
     table.insert(self.observers, observer)
 
-    return Subscription.create(
-        function()
-            for i = 1, #self.observers do
-                if self.observers[i] == observer then
-                    table.remove(self.observers, i)
-                    return
-                end
+    return Subscription.create(function()
+        for i = 1, #self.observers do
+            if self.observers[i] == observer then
+                table.remove(self.observers, i)
+                return
             end
         end
-    )
+    end)
 end
 
 --- Pushes zero or more values to the Subject. They will be broadcasted to all Observers.

@@ -12,7 +12,7 @@ Observable.__tostring = util.constant("Observable")
 -- @returns {Observable}
 function Observable.create(subscribe)
     local self = {
-        _subscribe = subscribe
+        _subscribe = subscribe,
     }
 
     return setmetatable(self, Observable)
@@ -32,28 +32,22 @@ end
 
 --- Returns an Observable that immediately completes without producing a value.
 function Observable.empty()
-    return Observable.create(
-        function(observer)
-            observer:onCompleted()
-        end
-    )
+    return Observable.create(function(observer)
+        observer:onCompleted()
+    end)
 end
 
 --- Returns an Observable that never produces values and never completes.
 function Observable.never()
-    return Observable.create(
-        function()
-        end
-    )
+    return Observable.create(function()
+    end)
 end
 
 --- Returns an Observable that immediately produces an error.
 function Observable.throw(message)
-    return Observable.create(
-        function(observer)
-            observer:onError(message)
-        end
-    )
+    return Observable.create(function(observer)
+        observer:onError(message)
+    end)
 end
 
 --- Creates an Observable that produces a set of values.
@@ -62,15 +56,13 @@ end
 function Observable.of(...)
     local args = {...}
     local argCount = select("#", ...)
-    return Observable.create(
-        function(observer)
-            for i = 1, argCount do
-                observer:onNext(args[i])
-            end
-
-            observer:onCompleted()
+    return Observable.create(function(observer)
+        for i = 1, argCount do
+            observer:onNext(args[i])
         end
-    )
+
+        observer:onCompleted()
+    end)
 end
 
 --- Creates an Observable that produces a range of values in a manner similar to a Lua for loop.
@@ -86,15 +78,13 @@ function Observable.fromRange(initial, limit, step)
 
     step = step or 1
 
-    return Observable.create(
-        function(observer)
-            for i = initial, limit, step do
-                observer:onNext(i)
-            end
-
-            observer:onCompleted()
+    return Observable.create(function(observer)
+        for i = initial, limit, step do
+            observer:onNext(i)
         end
-    )
+
+        observer:onCompleted()
+    end)
 end
 
 --- Creates an Observable that produces values from a table.
@@ -104,15 +94,13 @@ end
 -- @returns {Observable}
 function Observable.fromTable(t, iterator, keys)
     iterator = iterator or pairs
-    return Observable.create(
-        function(observer)
-            for key, value in iterator(t) do
-                observer:onNext(value, keys and key or nil)
-            end
-
-            observer:onCompleted()
+    return Observable.create(function(observer)
+        for key, value in iterator(t) do
+            observer:onNext(value, keys and key or nil)
         end
-    )
+
+        observer:onCompleted()
+    end)
 end
 
 --- Creates an Observable that produces values when the specified coroutine yields.
@@ -122,52 +110,46 @@ end
 --                             coroutine will be created for each Observer when a function is used.
 -- @returns {Observable}
 function Observable.fromCoroutine(fn, scheduler)
-    return Observable.create(
-        function(observer)
-            local thread = type(fn) == "function" and coroutine.create(fn) or fn
-            return scheduler:schedule(
-                function()
-                    while not observer.stopped do
-                        local success, value = coroutine.resume(thread)
+    return Observable.create(function(observer)
+        local thread = type(fn) == "function" and coroutine.create(fn) or fn
+        return scheduler:schedule(function()
+            while not observer.stopped do
+                local success, value = coroutine.resume(thread)
 
-                        if success then
-                            observer:onNext(value)
-                        else
-                            return observer:onError(value)
-                        end
-
-                        if coroutine.status(thread) == "dead" then
-                            return observer:onCompleted()
-                        end
-
-                        coroutine.yield()
-                    end
+                if success then
+                    observer:onNext(value)
+                else
+                    return observer:onError(value)
                 end
-            )
-        end
-    )
+
+                if coroutine.status(thread) == "dead" then
+                    return observer:onCompleted()
+                end
+
+                coroutine.yield()
+            end
+        end)
+    end)
 end
 
 --- Creates an Observable that produces values from a file, line by line.
 -- @arg {string} filename - The name of the file used to create the Observable
 -- @returns {Observable}
 function Observable.fromFileByLine(filename)
-    return Observable.create(
-        function(observer)
-            local file = io.open(filename, "r")
-            if file then
-                file:close()
+    return Observable.create(function(observer)
+        local file = io.open(filename, "r")
+        if file then
+            file:close()
 
-                for line in io.lines(filename) do
-                    observer:onNext(line)
-                end
-
-                return observer:onCompleted()
-            else
-                return observer:onError(filename)
+            for line in io.lines(filename) do
+                observer:onNext(line)
             end
+
+            return observer:onCompleted()
+        else
+            return observer:onError(filename)
         end
-    )
+    end)
 end
 
 --- Creates an Observable that creates a new Observable for each observer using a factory function.
@@ -178,15 +160,12 @@ function Observable.defer(fn)
         error("Expected a function")
     end
 
-    return setmetatable(
-        {
-            subscribe = function(_, ...)
-                local observable = fn()
-                return observable:subscribe(...)
-            end
-        },
-        Observable
-    )
+    return setmetatable({
+        subscribe = function(_, ...)
+            local observable = fn()
+            return observable:subscribe(...)
+        end,
+    }, Observable)
 end
 
 --- Returns an Observable that repeats a value a specified number of times.
@@ -195,17 +174,15 @@ end
 --                        is repeated an infinite number of times.
 -- @returns {Observable}
 function Observable.replicate(value, count)
-    return Observable.create(
-        function(observer)
-            while count == nil or count > 0 do
-                observer:onNext(value)
-                if count then
-                    count = count - 1
-                end
+    return Observable.create(function(observer)
+        while count == nil or count > 0 do
+            observer:onNext(value)
+            if count then
+                count = count - 1
             end
-            observer:onCompleted()
         end
-    )
+        observer:onCompleted()
+    end)
 end
 
 --- Subscribes to this Observable and prints values it produces.

@@ -8,33 +8,31 @@ function Observable:elementAt(index)
         error("Expected a number")
     end
 
-    return Observable.create(
-        function(observer)
-            local subscription
-            local i = 1
+    return Observable.create(function(observer)
+        local subscription
+        local i = 1
 
-            local function onNext(...)
-                if i == index then
-                    observer:onNext(...)
-                    observer:onCompleted()
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                else
-                    i = i + 1
+        local function onNext(...)
+            if i == index then
+                observer:onNext(...)
+                observer:onCompleted()
+                if subscription then
+                    subscription:unsubscribe()
                 end
+            else
+                i = i + 1
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end

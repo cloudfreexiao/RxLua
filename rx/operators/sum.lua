@@ -4,10 +4,7 @@ local Observable = require "rx.observable"
 -- by the original.
 -- @returns {Observable}
 function Observable:sum()
-    return self:reduce(
-        function(x, y)
-            return x + y
-        end,
-        0
-    )
+    return self:reduce(function(x, y)
+        return x + y
+    end, 0)
 end

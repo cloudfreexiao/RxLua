@@ -1,12 +1,14 @@
 -- RxLua v0.0.3
 -- https://github.com/bjornbytes/rxlua
 -- MIT License
-
 local util = {}
 
 util.pack = table.pack or function(...)
-        return {n = select("#", ...), ...}
-    end
+    return {
+        n = select("#", ...),
+        ...,
+    }
+end
 util.unpack = table.unpack or _G.unpack
 util.eq = function(x, y)
     return x == y
@@ -46,7 +48,7 @@ Subscription.__tostring = util.constant("Subscription")
 function Subscription.create(action)
     local self = {
         action = action or util.noop,
-        unsubscribed = false
+        unsubscribed = false,
     }
 
     return setmetatable(self, Subscription)
@@ -77,7 +79,7 @@ function Observer.create(onNext, onError, onCompleted)
         _onNext = onNext or util.noop,
         _onError = onError or error,
         _onCompleted = onCompleted or util.noop,
-        stopped = false
+        stopped = false,
     }
 
     return setmetatable(self, Observer)
@@ -119,7 +121,7 @@ Observable.__tostring = util.constant("Observable")
 -- @returns {Observable}
 function Observable.create(subscribe)
     local self = {
-        _subscribe = subscribe
+        _subscribe = subscribe,
     }
 
     return setmetatable(self, Observable)
@@ -139,28 +141,22 @@ end
 
 --- Returns an Observable that immediately completes without producing a value.
 function Observable.empty()
-    return Observable.create(
-        function(observer)
-            observer:onCompleted()
-        end
-    )
+    return Observable.create(function(observer)
+        observer:onCompleted()
+    end)
 end
 
 --- Returns an Observable that never produces values and never completes.
 function Observable.never()
-    return Observable.create(
-        function()
-        end
-    )
+    return Observable.create(function()
+    end)
 end
 
 --- Returns an Observable that immediately produces an error.
 function Observable.throw(message)
-    return Observable.create(
-        function(observer)
-            observer:onError(message)
-        end
-    )
+    return Observable.create(function(observer)
+        observer:onError(message)
+    end)
 end
 
 --- Creates an Observable that produces a set of values.
@@ -169,15 +165,13 @@ end
 function Observable.of(...)
     local args = {...}
     local argCount = select("#", ...)
-    return Observable.create(
-        function(observer)
-            for i = 1, argCount do
-                observer:onNext(args[i])
-            end
-
-            observer:onCompleted()
+    return Observable.create(function(observer)
+        for i = 1, argCount do
+            observer:onNext(args[i])
         end
-    )
+
+        observer:onCompleted()
+    end)
 end
 
 --- Creates an Observable that produces a range of values in a manner similar to a Lua for loop.
@@ -193,15 +187,13 @@ function Observable.fromRange(initial, limit, step)
 
     step = step or 1
 
-    return Observable.create(
-        function(observer)
-            for i = initial, limit, step do
-                observer:onNext(i)
-            end
-
-            observer:onCompleted()
+    return Observable.create(function(observer)
+        for i = initial, limit, step do
+            observer:onNext(i)
         end
-    )
+
+        observer:onCompleted()
+    end)
 end
 
 --- Creates an Observable that produces values from a table.
@@ -211,15 +203,13 @@ end
 -- @returns {Observable}
 function Observable.fromTable(t, iterator, keys)
     iterator = iterator or pairs
-    return Observable.create(
-        function(observer)
-            for key, value in iterator(t) do
-                observer:onNext(value, keys and key or nil)
-            end
-
-            observer:onCompleted()
+    return Observable.create(function(observer)
+        for key, value in iterator(t) do
+            observer:onNext(value, keys and key or nil)
         end
-    )
+
+        observer:onCompleted()
+    end)
 end
 
 --- Creates an Observable that produces values when the specified coroutine yields.
@@ -229,52 +219,46 @@ end
 --                             coroutine will be created for each Observer when a function is used.
 -- @returns {Observable}
 function Observable.fromCoroutine(fn, scheduler)
-    return Observable.create(
-        function(observer)
-            local thread = type(fn) == "function" and coroutine.create(fn) or fn
-            return scheduler:schedule(
-                function()
-                    while not observer.stopped do
-                        local success, value = coroutine.resume(thread)
+    return Observable.create(function(observer)
+        local thread = type(fn) == "function" and coroutine.create(fn) or fn
+        return scheduler:schedule(function()
+            while not observer.stopped do
+                local success, value = coroutine.resume(thread)
 
-                        if success then
-                            observer:onNext(value)
-                        else
-                            return observer:onError(value)
-                        end
-
-                        if coroutine.status(thread) == "dead" then
-                            return observer:onCompleted()
-                        end
-
-                        coroutine.yield()
-                    end
+                if success then
+                    observer:onNext(value)
+                else
+                    return observer:onError(value)
                 end
-            )
-        end
-    )
+
+                if coroutine.status(thread) == "dead" then
+                    return observer:onCompleted()
+                end
+
+                coroutine.yield()
+            end
+        end)
+    end)
 end
 
 --- Creates an Observable that produces values from a file, line by line.
 -- @arg {string} filename - The name of the file used to create the Observable
 -- @returns {Observable}
 function Observable.fromFileByLine(filename)
-    return Observable.create(
-        function(observer)
-            local file = io.open(filename, "r")
-            if file then
-                file:close()
+    return Observable.create(function(observer)
+        local file = io.open(filename, "r")
+        if file then
+            file:close()
 
-                for line in io.lines(filename) do
-                    observer:onNext(line)
-                end
-
-                return observer:onCompleted()
-            else
-                return observer:onError(filename)
+            for line in io.lines(filename) do
+                observer:onNext(line)
             end
+
+            return observer:onCompleted()
+        else
+            return observer:onError(filename)
         end
-    )
+    end)
 end
 
 --- Creates an Observable that creates a new Observable for each observer using a factory function.
@@ -285,15 +269,12 @@ function Observable.defer(fn)
         error("Expected a function")
     end
 
-    return setmetatable(
-        {
-            subscribe = function(_, ...)
-                local observable = fn()
-                return observable:subscribe(...)
-            end
-        },
-        Observable
-    )
+    return setmetatable({
+        subscribe = function(_, ...)
+            local observable = fn()
+            return observable:subscribe(...)
+        end,
+    }, Observable)
 end
 
 --- Returns an Observable that repeats a value a specified number of times.
@@ -302,17 +283,15 @@ end
 --                        is repeated an infinite number of times.
 -- @returns {Observable}
 function Observable.replicate(value, count)
-    return Observable.create(
-        function(observer)
-            while count == nil or count > 0 do
-                observer:onNext(value)
-                if count then
-                    count = count - 1
-                end
+    return Observable.create(function(observer)
+        while count == nil or count > 0 do
+            observer:onNext(value)
+            if count then
+                count = count - 1
             end
-            observer:onCompleted()
         end
-    )
+        observer:onCompleted()
+    end)
 end
 
 --- Subscribes to this Observable and prints values it produces.
@@ -346,38 +325,32 @@ end
 function Observable:all(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local subscription
-            local function onNext(...)
-                util.tryWithObserver(
-                    observer,
-                    function(...)
-                        if not predicate(...) then
-                            observer:onNext(false)
-                            if subscription then
-                                subscription:unsubscribe()
-                            end
-                            observer:onCompleted()
-                        end
-                    end,
-                    ...
-                )
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                observer:onNext(true)
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
+    return Observable.create(function(observer)
+        local subscription
+        local function onNext(...)
+            util.tryWithObserver(observer, function(...)
+                if not predicate(...) then
+                    observer:onNext(false)
+                    if subscription then
+                        subscription:unsubscribe()
+                    end
+                    observer:onCompleted()
+                end
+            end, ...)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            observer:onNext(true)
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Given a set of Observables, produces values from only the first one to produce a value.
@@ -388,92 +361,86 @@ function Observable.amb(a, b, ...)
         return a
     end
 
-    return Observable.create(
-        function(observer)
-            local subscriptionA, subscriptionB
+    return Observable.create(function(observer)
+        local subscriptionA, subscriptionB
 
-            local function onNextA(...)
-                if subscriptionB then
-                    subscriptionB:unsubscribe()
-                end
-                observer:onNext(...)
+        local function onNextA(...)
+            if subscriptionB then
+                subscriptionB:unsubscribe()
             end
-
-            local function onErrorA(e)
-                if subscriptionB then
-                    subscriptionB:unsubscribe()
-                end
-                observer:onError(e)
-            end
-
-            local function onCompletedA()
-                if subscriptionB then
-                    subscriptionB:unsubscribe()
-                end
-                observer:onCompleted()
-            end
-
-            local function onNextB(...)
-                if subscriptionA then
-                    subscriptionA:unsubscribe()
-                end
-                observer:onNext(...)
-            end
-
-            local function onErrorB(e)
-                if subscriptionA then
-                    subscriptionA:unsubscribe()
-                end
-                observer:onError(e)
-            end
-
-            local function onCompletedB()
-                if subscriptionA then
-                    subscriptionA:unsubscribe()
-                end
-                observer:onCompleted()
-            end
-
-            subscriptionA = a:subscribe(onNextA, onErrorA, onCompletedA)
-            subscriptionB = b:subscribe(onNextB, onErrorB, onCompletedB)
-
-            return Subscription.create(
-                function()
-                    subscriptionA:unsubscribe()
-                    subscriptionB:unsubscribe()
-                end
-            )
+            observer:onNext(...)
         end
-    ):amb(...)
+
+        local function onErrorA(e)
+            if subscriptionB then
+                subscriptionB:unsubscribe()
+            end
+            observer:onError(e)
+        end
+
+        local function onCompletedA()
+            if subscriptionB then
+                subscriptionB:unsubscribe()
+            end
+            observer:onCompleted()
+        end
+
+        local function onNextB(...)
+            if subscriptionA then
+                subscriptionA:unsubscribe()
+            end
+            observer:onNext(...)
+        end
+
+        local function onErrorB(e)
+            if subscriptionA then
+                subscriptionA:unsubscribe()
+            end
+            observer:onError(e)
+        end
+
+        local function onCompletedB()
+            if subscriptionA then
+                subscriptionA:unsubscribe()
+            end
+            observer:onCompleted()
+        end
+
+        subscriptionA = a:subscribe(onNextA, onErrorA, onCompletedA)
+        subscriptionB = b:subscribe(onNextB, onErrorB, onCompletedB)
+
+        return Subscription.create(function()
+            subscriptionA:unsubscribe()
+            subscriptionB:unsubscribe()
+        end)
+    end):amb(...)
 end
 
 --- Returns an Observable that produces the average of all values produced by the original.
 -- @returns {Observable}
 function Observable:average()
-    return Observable.create(
-        function(observer)
-            local sum, count = 0, 0
+    return Observable.create(function(observer)
+        local sum, count = 0, 0
 
-            local function onNext(value)
-                sum = sum + value
-                count = count + 1
-            end
-
-            local function onError(e)
-                observer:onError(e)
-            end
-
-            local function onCompleted()
-                if count > 0 then
-                    observer:onNext(sum / count)
-                end
-
-                observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(value)
+            sum = sum + value
+            count = count + 1
         end
-    )
+
+        local function onError(e)
+            observer:onError(e)
+        end
+
+        local function onCompleted()
+            if count > 0 then
+                observer:onNext(sum / count)
+            end
+
+            observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that buffers values from the original and produces them as multiple
@@ -484,40 +451,38 @@ function Observable:buffer(size)
         error("Expected a number")
     end
 
-    return Observable.create(
-        function(observer)
-            local buffer = {}
+    return Observable.create(function(observer)
+        local buffer = {}
 
-            local function emit()
-                if #buffer > 0 then
-                    observer:onNext(util.unpack(buffer))
-                    buffer = {}
-                end
+        local function emit()
+            if #buffer > 0 then
+                observer:onNext(util.unpack(buffer))
+                buffer = {}
             end
-
-            local function onNext(...)
-                local values = {...}
-                for i = 1, #values do
-                    table.insert(buffer, values[i])
-                    if #buffer >= size then
-                        emit()
-                    end
-                end
-            end
-
-            local function onError(message)
-                emit()
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                emit()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onNext(...)
+            local values = {...}
+            for i = 1, #values do
+                table.insert(buffer, values[i])
+                if #buffer >= size then
+                    emit()
+                end
+            end
+        end
+
+        local function onError(message)
+            emit()
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            emit()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that intercepts any errors from the previous and replace them with values
@@ -528,41 +493,39 @@ end
 function Observable:catch(handler)
     handler = handler and (type(handler) == "function" and handler or util.constant(handler))
 
-    return Observable.create(
-        function(observer)
-            local subscription
+    return Observable.create(function(observer)
+        local subscription
 
-            local function onNext(...)
-                return observer:onNext(...)
-            end
-
-            local function onError(e)
-                if not handler then
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                    return observer:onCompleted()
-                end
-
-                local success, _continue = pcall(handler, e)
-                if success and _continue then
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                    _continue:subscribe(observer)
-                else
-                    observer:onError(success and e or _continue)
-                end
-            end
-
-            local function onCompleted()
-                observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
+        local function onNext(...)
+            return observer:onNext(...)
         end
-    )
+
+        local function onError(e)
+            if not handler then
+                if subscription then
+                    subscription:unsubscribe()
+                end
+                return observer:onCompleted()
+            end
+
+            local success, _continue = pcall(handler, e)
+            if success and _continue then
+                if subscription then
+                    subscription:unsubscribe()
+                end
+                _continue:subscribe(observer)
+            else
+                observer:onError(success and e or _continue)
+            end
+        end
+
+        local function onCompleted()
+            observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Returns a new Observable that runs a combinator function on the most recent values from a set
@@ -583,58 +546,51 @@ function Observable:combineLatest(...)
     end
     table.insert(sources, 1, self)
 
-    return Observable.create(
-        function(observer)
-            local latest = {}
-            local pending = {util.unpack(sources)}
-            local completed = {}
-            local subscription = {}
+    return Observable.create(function(observer)
+        local latest = {}
+        local pending = {util.unpack(sources)}
+        local completed = {}
+        local subscription = {}
 
-            local function onNext(i)
-                return function(value)
-                    latest[i] = value
-                    pending[i] = nil
+        local function onNext(i)
+            return function(value)
+                latest[i] = value
+                pending[i] = nil
 
-                    if not next(pending) then
-                        util.tryWithObserver(
-                            observer,
-                            function()
-                                observer:onNext(combinator(util.unpack(latest)))
-                            end
-                        )
-                    end
+                if not next(pending) then
+                    util.tryWithObserver(observer, function()
+                        observer:onNext(combinator(util.unpack(latest)))
+                    end)
                 end
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted(i)
-                return function()
-                    table.insert(completed, i)
-
-                    if #completed == #sources then
-                        observer:onCompleted()
-                    end
-                end
-            end
-
-            for i = 1, #sources do
-                subscription[i] = sources[i]:subscribe(onNext(i), onError, onCompleted(i))
-            end
-
-            return Subscription.create(
-                function()
-                    for i = 1, #sources do
-                        if subscription[i] then
-                            subscription[i]:unsubscribe()
-                        end
-                    end
-                end
-            )
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted(i)
+            return function()
+                table.insert(completed, i)
+
+                if #completed == #sources then
+                    observer:onCompleted()
+                end
+            end
+        end
+
+        for i = 1, #sources do
+            subscription[i] = sources[i]:subscribe(onNext(i), onError, onCompleted(i))
+        end
+
+        return Subscription.create(function()
+            for i = 1, #sources do
+                if subscription[i] then
+                    subscription[i]:unsubscribe()
+                end
+            end
+        end)
+    end)
 end
 
 --- Returns a new Observable that produces the values of the first with falsy values removed.
@@ -654,27 +610,25 @@ function Observable:concat(other, ...)
 
     local others = {...}
 
-    return Observable.create(
-        function(observer)
-            local function onNext(...)
-                return observer:onNext(...)
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            local function chain()
-                return other:concat(util.unpack(others)):subscribe(onNext, onError, onCompleted)
-            end
-
-            return self:subscribe(onNext, onError, chain)
+    return Observable.create(function(observer)
+        local function onNext(...)
+            return observer:onNext(...)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        local function chain()
+            return other:concat(util.unpack(others)):subscribe(onNext, onError, onCompleted)
+        end
+
+        return self:subscribe(onNext, onError, chain)
+    end)
 end
 
 --- Returns a new Observable that produces a single boolean value representing whether or not the
@@ -682,45 +636,43 @@ end
 -- @arg {*} value - The value to search for.  == is used for equality testing.
 -- @returns {Observable}
 function Observable:contains(value)
-    return Observable.create(
-        function(observer)
-            local subscription
+    return Observable.create(function(observer)
+        local subscription
 
-            local function onNext(...)
-                local args = util.pack(...)
+        local function onNext(...)
+            local args = util.pack(...)
 
-                if #args == 0 and value == nil then
+            if #args == 0 and value == nil then
+                observer:onNext(true)
+                if subscription then
+                    subscription:unsubscribe()
+                end
+                return observer:onCompleted()
+            end
+
+            for i = 1, #args do
+                if args[i] == value then
                     observer:onNext(true)
                     if subscription then
                         subscription:unsubscribe()
                     end
                     return observer:onCompleted()
                 end
-
-                for i = 1, #args do
-                    if args[i] == value then
-                        observer:onNext(true)
-                        if subscription then
-                            subscription:unsubscribe()
-                        end
-                        return observer:onCompleted()
-                    end
-                end
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                observer:onNext(false)
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            observer:onNext(false)
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Returns an Observable that produces a single value representing the number of values produced
@@ -729,34 +681,28 @@ end
 function Observable:count(predicate)
     predicate = predicate or util.constant(true)
 
-    return Observable.create(
-        function(observer)
-            local count = 0
+    return Observable.create(function(observer)
+        local count = 0
 
-            local function onNext(...)
-                util.tryWithObserver(
-                    observer,
-                    function(...)
-                        if predicate(...) then
-                            count = count + 1
-                        end
-                    end,
-                    ...
-                )
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                observer:onNext(count)
-                observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(...)
+            util.tryWithObserver(observer, function(...)
+                if predicate(...) then
+                    count = count + 1
+                end
+            end, ...)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            observer:onNext(count)
+            observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new throttled Observable that waits to produce values until a timeout has expired, at
@@ -768,42 +714,34 @@ end
 function Observable:debounce(time, scheduler)
     time = time or 0
 
-    return Observable.create(
-        function(observer)
-            local debounced = {}
+    return Observable.create(function(observer)
+        local debounced = {}
 
-            local function wrap(key)
-                return function(...)
-                    if debounced[key] then
-                        debounced[key]:unsubscribe()
-                    end
-
-                    local values = util.pack(...)
-
-                    debounced[key] =
-                        scheduler:schedule(
-                        function()
-                            return observer[key](observer, util.unpack(values))
-                        end,
-                        time
-                    )
+        local function wrap(key)
+            return function(...)
+                if debounced[key] then
+                    debounced[key]:unsubscribe()
                 end
+
+                local values = util.pack(...)
+
+                debounced[key] = scheduler:schedule(function()
+                    return observer[key](observer, util.unpack(values))
+                end, time)
             end
-
-            local subscription = self:subscribe(wrap("onNext"), wrap("onError"), wrap("onCompleted"))
-
-            return Subscription.create(
-                function()
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                    for _, timeout in pairs(debounced) do
-                        timeout:unsubscribe()
-                    end
-                end
-            )
         end
-    )
+
+        local subscription = self:subscribe(wrap("onNext"), wrap("onError"), wrap("onCompleted"))
+
+        return Subscription.create(function()
+            if subscription then
+                subscription:unsubscribe()
+            end
+            for _, timeout in pairs(debounced) do
+                timeout:unsubscribe()
+            end
+        end)
+    end)
 end
 
 --- Returns a new Observable that produces a default set of items if the source Observable produces
@@ -814,30 +752,28 @@ end
 function Observable:defaultIfEmpty(...)
     local defaults = util.pack(...)
 
-    return Observable.create(
-        function(observer)
-            local hasValue = false
+    return Observable.create(function(observer)
+        local hasValue = false
 
-            local function onNext(...)
-                hasValue = true
-                observer:onNext(...)
-            end
-
-            local function onError(e)
-                observer:onError(e)
-            end
-
-            local function onCompleted()
-                if not hasValue then
-                    observer:onNext(util.unpack(defaults))
-                end
-
-                observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(...)
+            hasValue = true
+            observer:onNext(...)
         end
-    )
+
+        local function onError(e)
+            observer:onError(e)
+        end
+
+        local function onCompleted()
+            if not hasValue then
+                observer:onNext(util.unpack(defaults))
+            end
+
+            observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that produces the values of the original delayed by a time period.
@@ -848,66 +784,56 @@ end
 function Observable:delay(time, scheduler)
     time = type(time) ~= "function" and util.constant(time) or time
 
-    return Observable.create(
-        function(observer)
-            local actions = {}
+    return Observable.create(function(observer)
+        local actions = {}
 
-            local function delay(key)
-                return function(...)
-                    local arg = util.pack(...)
-                    local handle =
-                        scheduler:schedule(
-                        function()
-                            observer[key](observer, util.unpack(arg))
-                        end,
-                        time()
-                    )
-                    table.insert(actions, handle)
-                end
+        local function delay(key)
+            return function(...)
+                local arg = util.pack(...)
+                local handle = scheduler:schedule(function()
+                    observer[key](observer, util.unpack(arg))
+                end, time())
+                table.insert(actions, handle)
             end
-
-            local subscription = self:subscribe(delay("onNext"), delay("onError"), delay("onCompleted"))
-
-            return Subscription.create(
-                function()
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                    for i = 1, #actions do
-                        actions[i]:unsubscribe()
-                    end
-                end
-            )
         end
-    )
+
+        local subscription = self:subscribe(delay("onNext"), delay("onError"), delay("onCompleted"))
+
+        return Subscription.create(function()
+            if subscription then
+                subscription:unsubscribe()
+            end
+            for i = 1, #actions do
+                actions[i]:unsubscribe()
+            end
+        end)
+    end)
 end
 
 --- Returns a new Observable that produces the values from the original with duplicates removed.
 -- @returns {Observable}
 function Observable:distinct()
-    return Observable.create(
-        function(observer)
-            local values = {}
+    return Observable.create(function(observer)
+        local values = {}
 
-            local function onNext(x)
-                if not values[x] then
-                    observer:onNext(x)
-                end
-
-                values[x] = true
+        local function onNext(x)
+            if not values[x] then
+                observer:onNext(x)
             end
 
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+            values[x] = true
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that only produces values from the original if they are different from
@@ -917,36 +843,31 @@ end
 function Observable:distinctUntilChanged(comparator)
     comparator = comparator or util.eq
 
-    return Observable.create(
-        function(observer)
-            local first = true
-            local currentValue = nil
+    return Observable.create(function(observer)
+        local first = true
+        local currentValue = nil
 
-            local function onNext(value, ...)
-                local values = util.pack(...)
-                util.tryWithObserver(
-                    observer,
-                    function()
-                        if first or not comparator(value, currentValue) then
-                            observer:onNext(value, util.unpack(values))
-                            currentValue = value
-                            first = false
-                        end
-                    end
-                )
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(value, ...)
+            local values = util.pack(...)
+            util.tryWithObserver(observer, function()
+                if first or not comparator(value, currentValue) then
+                    observer:onNext(value, util.unpack(values))
+                    currentValue = value
+                    first = false
+                end
+            end)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that produces the nth element produced by the source Observable.
@@ -957,35 +878,33 @@ function Observable:elementAt(index)
         error("Expected a number")
     end
 
-    return Observable.create(
-        function(observer)
-            local subscription
-            local i = 1
+    return Observable.create(function(observer)
+        local subscription
+        local i = 1
 
-            local function onNext(...)
-                if i == index then
-                    observer:onNext(...)
-                    observer:onCompleted()
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                else
-                    i = i + 1
+        local function onNext(...)
+            if i == index then
+                observer:onNext(...)
+                observer:onCompleted()
+                if subscription then
+                    subscription:unsubscribe()
                 end
+            else
+                i = i + 1
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Returns a new Observable that only produces values of the first that satisfy a predicate.
@@ -994,31 +913,25 @@ end
 function Observable:filter(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local function onNext(...)
-                util.tryWithObserver(
-                    observer,
-                    function(...)
-                        if predicate(...) then
-                            return observer:onNext(...)
-                        end
-                    end,
-                    ...
-                )
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+    return Observable.create(function(observer)
+        local function onNext(...)
+            util.tryWithObserver(observer, function(...)
+                if predicate(...) then
+                    return observer:onNext(...)
+                end
+            end, ...)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that produces the first value of the original that satisfies a
@@ -1027,38 +940,32 @@ end
 function Observable:find(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local subscription
+    return Observable.create(function(observer)
+        local subscription
 
-            local function onNext(...)
-                util.tryWithObserver(
-                    observer,
-                    function(...)
-                        if predicate(...) then
-                            observer:onNext(...)
-                            if subscription then
-                                subscription:unsubscribe()
-                            end
-                            return observer:onCompleted()
-                        end
-                    end,
-                    ...
-                )
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
+        local function onNext(...)
+            util.tryWithObserver(observer, function(...)
+                if predicate(...) then
+                    observer:onNext(...)
+                    if subscription then
+                        subscription:unsubscribe()
+                    end
+                    return observer:onCompleted()
+                end
+            end, ...)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Returns a new Observable that only produces the first result of the original.
@@ -1082,172 +989,150 @@ end
 -- @returns {Observable}
 function Observable:flatMapLatest(callback)
     callback = callback or util.identity
-    return Observable.create(
-        function(observer)
-            local innerSubscription
+    return Observable.create(function(observer)
+        local innerSubscription
 
-            local function onNext(...)
-                observer:onNext(...)
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            local function subscribeInner(...)
-                if innerSubscription then
-                    innerSubscription:unsubscribe()
-                end
-
-                return util.tryWithObserver(
-                    observer,
-                    function(...)
-                        innerSubscription = callback(...):subscribe(onNext, onError)
-                    end,
-                    ...
-                )
-            end
-
-            local subscription = self:subscribe(subscribeInner, onError, onCompleted)
-            return Subscription.create(
-                function()
-                    if innerSubscription then
-                        innerSubscription:unsubscribe()
-                    end
-
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                end
-            )
+        local function onNext(...)
+            observer:onNext(...)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        local function subscribeInner(...)
+            if innerSubscription then
+                innerSubscription:unsubscribe()
+            end
+
+            return util.tryWithObserver(observer, function(...)
+                innerSubscription = callback(...):subscribe(onNext, onError)
+            end, ...)
+        end
+
+        local subscription = self:subscribe(subscribeInner, onError, onCompleted)
+        return Subscription.create(function()
+            if innerSubscription then
+                innerSubscription:unsubscribe()
+            end
+
+            if subscription then
+                subscription:unsubscribe()
+            end
+        end)
+    end)
 end
 
 --- Returns a new Observable that subscribes to the Observables produced by the original and
 -- produces their values.
 -- @returns {Observable}
 function Observable:flatten()
-    return Observable.create(
-        function(observer)
-            local subscriptions = {}
-            local remaining = 1
+    return Observable.create(function(observer)
+        local subscriptions = {}
+        local remaining = 1
 
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                remaining = remaining - 1
-                if remaining == 0 then
-                    return observer:onCompleted()
-                end
-            end
-
-            local function onNext(observable)
-                local function innerOnNext(...)
-                    observer:onNext(...)
-                end
-
-                remaining = remaining + 1
-                local subscription = observable:subscribe(innerOnNext, onError, onCompleted)
-                subscriptions[#subscriptions + 1] = subscription
-            end
-
-            subscriptions[#subscriptions + 1] = self:subscribe(onNext, onError, onCompleted)
-            return Subscription.create(
-                function()
-                    for i = 1, #subscriptions do
-                        subscriptions[i]:unsubscribe()
-                    end
-                end
-            )
+        local function onError(message)
+            return observer:onError(message)
         end
-    )
+
+        local function onCompleted()
+            remaining = remaining - 1
+            if remaining == 0 then
+                return observer:onCompleted()
+            end
+        end
+
+        local function onNext(observable)
+            local function innerOnNext(...)
+                observer:onNext(...)
+            end
+
+            remaining = remaining + 1
+            local subscription = observable:subscribe(innerOnNext, onError, onCompleted)
+            subscriptions[#subscriptions + 1] = subscription
+        end
+
+        subscriptions[#subscriptions + 1] = self:subscribe(onNext, onError, onCompleted)
+        return Subscription.create(function()
+            for i = 1, #subscriptions do
+                subscriptions[i]:unsubscribe()
+            end
+        end)
+    end)
 end
 
 --- Returns an Observable that terminates when the source terminates but does not produce any
 -- elements.
 -- @returns {Observable}
 function Observable:ignoreElements()
-    return Observable.create(
-        function(observer)
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(nil, onError, onCompleted)
+    return Observable.create(function(observer)
+        local function onError(message)
+            return observer:onError(message)
         end
-    )
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(nil, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that only produces the last result of the original.
 -- @returns {Observable}
 function Observable:last()
-    return Observable.create(
-        function(observer)
-            local value
-            local empty = true
+    return Observable.create(function(observer)
+        local value
+        local empty = true
 
-            local function onNext(...)
-                value = {...}
-                empty = false
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                if not empty then
-                    observer:onNext(util.unpack(value or {}))
-                end
-
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(...)
+            value = {...}
+            empty = false
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            if not empty then
+                observer:onNext(util.unpack(value or {}))
+            end
+
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that produces the values of the original transformed by a function.
 -- @arg {function} callback - The function to transform values from the original Observable.
 -- @returns {Observable}
 function Observable:map(callback)
-    return Observable.create(
-        function(observer)
-            callback = callback or util.identity
+    return Observable.create(function(observer)
+        callback = callback or util.identity
 
-            local function onNext(...)
-                return util.tryWithObserver(
-                    observer,
-                    function(...)
-                        return observer:onNext(callback(...))
-                    end,
-                    ...
-                )
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(...)
+            return util.tryWithObserver(observer, function(...)
+                return observer:onNext(callback(...))
+            end, ...)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that produces the maximum value produced by the original.
@@ -1264,44 +1149,40 @@ function Observable:merge(...)
     local sources = {...}
     table.insert(sources, 1, self)
 
-    return Observable.create(
-        function(observer)
-            local completed = {}
-            local subscriptions = {}
+    return Observable.create(function(observer)
+        local completed = {}
+        local subscriptions = {}
 
-            local function onNext(...)
-                return observer:onNext(...)
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted(i)
-                return function()
-                    table.insert(completed, i)
-
-                    if #completed == #sources then
-                        observer:onCompleted()
-                    end
-                end
-            end
-
-            for i = 1, #sources do
-                subscriptions[i] = sources[i]:subscribe(onNext, onError, onCompleted(i))
-            end
-
-            return Subscription.create(
-                function()
-                    for i = 1, #sources do
-                        if subscriptions[i] then
-                            subscriptions[i]:unsubscribe()
-                        end
-                    end
-                end
-            )
+        local function onNext(...)
+            return observer:onNext(...)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted(i)
+            return function()
+                table.insert(completed, i)
+
+                if #completed == #sources then
+                    observer:onCompleted()
+                end
+            end
+        end
+
+        for i = 1, #sources do
+            subscriptions[i] = sources[i]:subscribe(onNext, onError, onCompleted(i))
+        end
+
+        return Subscription.create(function()
+            for i = 1, #sources do
+                if subscriptions[i] then
+                    subscriptions[i]:unsubscribe()
+                end
+            end
+        end)
+    end)
 end
 
 --- Returns a new Observable that produces the minimum value produced by the original.
@@ -1339,23 +1220,21 @@ function Observable:pluck(key, ...)
         return Observable.throw("pluck key must be a string")
     end
 
-    return Observable.create(
-        function(observer)
-            local function onNext(t)
-                return observer:onNext(t[key])
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+    return Observable.create(function(observer)
+        local function onNext(t)
+            return observer:onNext(t[key])
         end
-    ):pluck(...)
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end):pluck(...)
 end
 
 --- Returns a new Observable that produces a single value computed by accumulating the results of
@@ -1366,38 +1245,32 @@ end
 -- @arg {*} seed - A value to pass to the accumulator the first time it is run.
 -- @returns {Observable}
 function Observable:reduce(accumulator, seed)
-    return Observable.create(
-        function(observer)
-            local result = seed
-            local first = true
+    return Observable.create(function(observer)
+        local result = seed
+        local first = true
 
-            local function onNext(...)
-                if first and seed == nil then
-                    result = ...
-                    first = false
-                else
-                    return util.tryWithObserver(
-                        observer,
-                        function(...)
-                            result = accumulator(result, ...)
-                        end,
-                        ...
-                    )
-                end
+        local function onNext(...)
+            if first and seed == nil then
+                result = ...
+                first = false
+            else
+                return util.tryWithObserver(observer, function(...)
+                    result = accumulator(result, ...)
+                end, ...)
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                observer:onNext(result)
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            observer:onNext(result)
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that produces values from the original which do not satisfy a
@@ -1407,31 +1280,25 @@ end
 function Observable:reject(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local function onNext(...)
-                util.tryWithObserver(
-                    observer,
-                    function(...)
-                        if not predicate(...) then
-                            return observer:onNext(...)
-                        end
-                    end,
-                    ...
-                )
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+    return Observable.create(function(observer)
+        local function onNext(...)
+            util.tryWithObserver(observer, function(...)
+                if not predicate(...) then
+                    return observer:onNext(...)
+                end
+            end, ...)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that restarts in the event of an error.
@@ -1439,35 +1306,33 @@ end
 --                        number of retries will be attempted.
 -- @returns {Observable}
 function Observable:retry(count)
-    return Observable.create(
-        function(observer)
-            local subscription
-            local retries = 0
+    return Observable.create(function(observer)
+        local subscription
+        local retries = 0
 
-            local function onNext(...)
-                return observer:onNext(...)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            local function onError(message)
-                if subscription then
-                    subscription:unsubscribe()
-                end
-
-                retries = retries + 1
-                if count and retries > count then
-                    return observer:onError(message)
-                end
-
-                subscription = self:subscribe(onNext, onError, onCompleted)
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+        local function onNext(...)
+            return observer:onNext(...)
         end
-    )
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        local function onError(message)
+            if subscription then
+                subscription:unsubscribe()
+            end
+
+            retries = retries + 1
+            if count and retries > count then
+                return observer:onError(message)
+            end
+
+            subscription = self:subscribe(onNext, onError, onCompleted)
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that produces its most recent value every time the specified observable
@@ -1479,43 +1344,39 @@ function Observable:sample(sampler)
         error("Expected an Observable")
     end
 
-    return Observable.create(
-        function(observer)
-            local latest = {}
+    return Observable.create(function(observer)
+        local latest = {}
 
-            local function setLatest(...)
-                latest = util.pack(...)
-            end
-
-            local function onNext()
-                if #latest > 0 then
-                    return observer:onNext(util.unpack(latest))
-                end
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            local sourceSubscription = self:subscribe(setLatest, onError)
-            local sampleSubscription = sampler:subscribe(onNext, onError, onCompleted)
-
-            return Subscription.create(
-                function()
-                    if sourceSubscription then
-                        sourceSubscription:unsubscribe()
-                    end
-                    if sampleSubscription then
-                        sampleSubscription:unsubscribe()
-                    end
-                end
-            )
+        local function setLatest(...)
+            latest = util.pack(...)
         end
-    )
+
+        local function onNext()
+            if #latest > 0 then
+                return observer:onNext(util.unpack(latest))
+            end
+        end
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        local sourceSubscription = self:subscribe(setLatest, onError)
+        local sampleSubscription = sampler:subscribe(onNext, onError, onCompleted)
+
+        return Subscription.create(function()
+            if sourceSubscription then
+                sourceSubscription:unsubscribe()
+            end
+            if sampleSubscription then
+                sampleSubscription:unsubscribe()
+            end
+        end)
+    end)
 end
 
 --- Returns a new Observable that produces values computed by accumulating the results of running a
@@ -1527,38 +1388,32 @@ end
 -- @arg {*} seed - A value to pass to the accumulator the first time it is run.
 -- @returns {Observable}
 function Observable:scan(accumulator, seed)
-    return Observable.create(
-        function(observer)
-            local result = seed
-            local first = true
+    return Observable.create(function(observer)
+        local result = seed
+        local first = true
 
-            local function onNext(...)
-                if first and seed == nil then
-                    result = ...
-                    first = false
-                else
-                    return util.tryWithObserver(
-                        observer,
-                        function(...)
-                            result = accumulator(result, ...)
-                            observer:onNext(result)
-                        end,
-                        ...
-                    )
-                end
+        local function onNext(...)
+            if first and seed == nil then
+                result = ...
+                first = false
+            else
+                return util.tryWithObserver(observer, function(...)
+                    result = accumulator(result, ...)
+                    observer:onNext(result)
+                end, ...)
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that skips over a specified number of values produced by the original
@@ -1568,29 +1423,27 @@ end
 function Observable:skip(n)
     n = n or 1
 
-    return Observable.create(
-        function(observer)
-            local i = 1
+    return Observable.create(function(observer)
+        local i = 1
 
-            local function onNext(...)
-                if i > n then
-                    observer:onNext(...)
-                else
-                    i = i + 1
-                end
+        local function onNext(...)
+            if i > n then
+                observer:onNext(...)
+            else
+                i = i + 1
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that omits a specified number of values from the end of the original
@@ -1603,32 +1456,30 @@ function Observable:skipLast(count)
     end
 
     local buffer = {}
-    return Observable.create(
-        function(observer)
-            local function emit()
-                if #buffer > count and buffer[1] then
-                    local values = table.remove(buffer, 1)
-                    observer:onNext(util.unpack(values))
-                end
+    return Observable.create(function(observer)
+        local function emit()
+            if #buffer > count and buffer[1] then
+                local values = table.remove(buffer, 1)
+                observer:onNext(util.unpack(values))
             end
-
-            local function onNext(...)
-                emit()
-                table.insert(buffer, util.pack(...))
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                emit()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onNext(...)
+            emit()
+            table.insert(buffer, util.pack(...))
+        end
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            emit()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that skips over values produced by the original until the specified
@@ -1636,36 +1487,34 @@ end
 -- @arg {Observable} other - The Observable that triggers the production of values.
 -- @returns {Observable}
 function Observable:skipUntil(other)
-    return Observable.create(
-        function(observer)
-            local triggered = false
-            local function trigger()
-                triggered = true
-            end
-
-            other:subscribe(trigger, trigger, trigger)
-
-            local function onNext(...)
-                if triggered then
-                    observer:onNext(...)
-                end
-            end
-
-            local function onError()
-                if triggered then
-                    observer:onError()
-                end
-            end
-
-            local function onCompleted()
-                if triggered then
-                    observer:onCompleted()
-                end
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+    return Observable.create(function(observer)
+        local triggered = false
+        local function trigger()
+            triggered = true
         end
-    )
+
+        other:subscribe(trigger, trigger, trigger)
+
+        local function onNext(...)
+            if triggered then
+                observer:onNext(...)
+            end
+        end
+
+        local function onError()
+            if triggered then
+                observer:onError()
+            end
+        end
+
+        local function onCompleted()
+            if triggered then
+                observer:onCompleted()
+            end
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that skips elements until the predicate returns falsy for one of them.
@@ -1674,37 +1523,31 @@ end
 function Observable:skipWhile(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local skipping = true
+    return Observable.create(function(observer)
+        local skipping = true
 
-            local function onNext(...)
-                if skipping then
-                    util.tryWithObserver(
-                        observer,
-                        function(...)
-                            skipping = predicate(...)
-                        end,
-                        ...
-                    )
-                end
-
-                if not skipping then
-                    return observer:onNext(...)
-                end
+        local function onNext(...)
+            if skipping then
+                util.tryWithObserver(observer, function(...)
+                    skipping = predicate(...)
+                end, ...)
             end
 
-            local function onError(message)
-                return observer:onError(message)
+            if not skipping then
+                return observer:onNext(...)
             end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that produces the specified values followed by all elements produced by
@@ -1714,68 +1557,59 @@ end
 -- @returns {Observable}
 function Observable:startWith(...)
     local values = util.pack(...)
-    return Observable.create(
-        function(observer)
-            observer:onNext(util.unpack(values))
-            return self:subscribe(observer)
-        end
-    )
+    return Observable.create(function(observer)
+        observer:onNext(util.unpack(values))
+        return self:subscribe(observer)
+    end)
 end
 
 --- Returns an Observable that produces a single value representing the sum of the values produced
 -- by the original.
 -- @returns {Observable}
 function Observable:sum()
-    return self:reduce(
-        function(x, y)
-            return x + y
-        end,
-        0
-    )
+    return self:reduce(function(x, y)
+        return x + y
+    end, 0)
 end
 
 --- Given an Observable that produces Observables, returns an Observable that produces the values
 -- produced by the most recently produced Observable.
 -- @returns {Observable}
 function Observable:switch()
-    return Observable.create(
-        function(observer)
-            local innerSubscription
+    return Observable.create(function(observer)
+        local innerSubscription
 
-            local function onNext(...)
-                return observer:onNext(...)
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            local function switch(source)
-                if innerSubscription then
-                    innerSubscription:unsubscribe()
-                end
-
-                innerSubscription = source:subscribe(onNext, onError, nil)
-            end
-
-            local subscription = self:subscribe(switch, onError, onCompleted)
-            return Subscription.create(
-                function()
-                    if innerSubscription then
-                        innerSubscription:unsubscribe()
-                    end
-
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                end
-            )
+        local function onNext(...)
+            return observer:onNext(...)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        local function switch(source)
+            if innerSubscription then
+                innerSubscription:unsubscribe()
+            end
+
+            innerSubscription = source:subscribe(onNext, onError, nil)
+        end
+
+        local subscription = self:subscribe(switch, onError, onCompleted)
+        return Subscription.create(function()
+            if innerSubscription then
+                innerSubscription:unsubscribe()
+            end
+
+            if subscription then
+                subscription:unsubscribe()
+            end
+        end)
+    end)
 end
 
 --- Returns a new Observable that only produces the first n results of the original.
@@ -1784,41 +1618,39 @@ end
 function Observable:take(n)
     n = n or 1
 
-    return Observable.create(
-        function(observer)
-            local subscription
-            if n <= 0 then
-                observer:onCompleted()
-                return
-            end
-
-            local i = 1
-
-            local function onNext(...)
-                observer:onNext(...)
-
-                i = i + 1
-
-                if i > n then
-                    if subscription then
-                        subscription:unsubscribe()
-                    end
-                    observer:onCompleted()
-                end
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
+    return Observable.create(function(observer)
+        local subscription
+        if n <= 0 then
+            observer:onCompleted()
+            return
         end
-    )
+
+        local i = 1
+
+        local function onNext(...)
+            observer:onNext(...)
+
+            i = i + 1
+
+            if i > n then
+                if subscription then
+                    subscription:unsubscribe()
+                end
+                observer:onCompleted()
+            end
+        end
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Returns an Observable that produces a specified number of elements from the end of a source
@@ -1830,61 +1662,57 @@ function Observable:takeLast(count)
         error("Expected a number")
     end
 
-    return Observable.create(
-        function(observer)
-            local buffer = {}
+    return Observable.create(function(observer)
+        local buffer = {}
 
-            local function onNext(...)
-                table.insert(buffer, util.pack(...))
-                if #buffer > count then
-                    table.remove(buffer, 1)
-                end
+        local function onNext(...)
+            table.insert(buffer, util.pack(...))
+            if #buffer > count then
+                table.remove(buffer, 1)
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                for i = 1, #buffer do
-                    observer:onNext(util.unpack(buffer[i]))
-                end
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            for i = 1, #buffer do
+                observer:onNext(util.unpack(buffer[i]))
+            end
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns a new Observable that completes when the specified Observable fires.
 -- @arg {Observable} other - The Observable that triggers completion of the original.
 -- @returns {Observable}
 function Observable:takeUntil(other)
-    return Observable.create(
-        function(observer)
-            local subscription
-            local function onNext(...)
-                return observer:onNext(...)
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                if subscription then
-                    subscription:unsubscribe()
-                end
-                return observer:onCompleted()
-            end
-
-            other:subscribe(onCompleted, onCompleted, onCompleted)
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
+    return Observable.create(function(observer)
+        local subscription
+        local function onNext(...)
+            return observer:onNext(...)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            if subscription then
+                subscription:unsubscribe()
+            end
+            return observer:onCompleted()
+        end
+
+        other:subscribe(onCompleted, onCompleted, onCompleted)
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Returns a new Observable that produces elements until the predicate returns falsy.
@@ -1893,44 +1721,38 @@ end
 function Observable:takeWhile(predicate)
     predicate = predicate or util.identity
 
-    return Observable.create(
-        function(observer)
-            local taking = true
-            local subscription
+    return Observable.create(function(observer)
+        local taking = true
+        local subscription
 
-            local function onNext(...)
+        local function onNext(...)
+            if taking then
+                util.tryWithObserver(observer, function(...)
+                    taking = predicate(...)
+                end, ...)
+
                 if taking then
-                    util.tryWithObserver(
-                        observer,
-                        function(...)
-                            taking = predicate(...)
-                        end,
-                        ...
-                    )
-
-                    if taking then
-                        return observer:onNext(...)
-                    else
-                        if subscription then
-                            subscription:unsubscribe()
-                        end
-                        return observer:onCompleted()
+                    return observer:onNext(...)
+                else
+                    if subscription then
+                        subscription:unsubscribe()
                     end
+                    return observer:onCompleted()
                 end
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            subscription = self:subscribe(onNext, onError, onCompleted)
-            return subscription
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end
 
 --- Runs a function each time this Observable has activity. Similar to subscribe but does not
@@ -1944,45 +1766,33 @@ function Observable:tap(_onNext, _onError, _onCompleted)
     _onError = _onError or util.noop
     _onCompleted = _onCompleted or util.noop
 
-    return Observable.create(
-        function(observer)
-            local function onNext(...)
-                util.tryWithObserver(
-                    observer,
-                    function(...)
-                        _onNext(...)
-                    end,
-                    ...
-                )
+    return Observable.create(function(observer)
+        local function onNext(...)
+            util.tryWithObserver(observer, function(...)
+                _onNext(...)
+            end, ...)
 
-                return observer:onNext(...)
-            end
-
-            local function onError(message)
-                util.tryWithObserver(
-                    observer,
-                    function()
-                        _onError(message)
-                    end
-                )
-
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                util.tryWithObserver(
-                    observer,
-                    function()
-                        _onCompleted()
-                    end
-                )
-
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+            return observer:onNext(...)
         end
-    )
+
+        local function onError(message)
+            util.tryWithObserver(observer, function()
+                _onError(message)
+            end)
+
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            util.tryWithObserver(observer, function()
+                _onCompleted()
+            end)
+
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that unpacks the tables produced by the original.
@@ -1995,26 +1805,24 @@ end
 -- return values and produces each value individually.
 -- @returns {Observable}
 function Observable:unwrap()
-    return Observable.create(
-        function(observer)
-            local function onNext(...)
-                local values = {...}
-                for i = 1, #values do
-                    observer:onNext(values[i])
-                end
+    return Observable.create(function(observer)
+        local function onNext(...)
+            local values = {...}
+            for i = 1, #values do
+                observer:onNext(values[i])
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that produces a sliding window of the values produced by the original.
@@ -2026,30 +1834,28 @@ function Observable:window(size)
         error("Expected a number")
     end
 
-    return Observable.create(
-        function(observer)
-            local window = {}
+    return Observable.create(function(observer)
+        local window = {}
 
-            local function onNext(value)
-                table.insert(window, value)
+        local function onNext(value)
+            table.insert(window, value)
 
-                if #window >= size then
-                    observer:onNext(util.unpack(window))
-                    table.remove(window, 1)
-                end
+            if #window >= size then
+                observer:onNext(util.unpack(window))
+                table.remove(window, 1)
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
 
 --- Returns an Observable that produces values from the original along with the most recently
@@ -2060,45 +1866,43 @@ end
 function Observable:with(...)
     local sources = {...}
 
-    return Observable.create(
-        function(observer)
-            local latest = setmetatable({}, {__len = util.constant(#sources)})
-            local subscriptions = {}
+    return Observable.create(function(observer)
+        local latest = setmetatable({}, {
+            __len = util.constant(#sources),
+        })
+        local subscriptions = {}
 
-            local function setLatest(i)
-                return function(value)
-                    latest[i] = value
-                end
+        local function setLatest(i)
+            return function(value)
+                latest[i] = value
             end
-
-            local function onNext(value)
-                return observer:onNext(value, util.unpack(latest))
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            for i = 1, #sources do
-                subscriptions[i] = sources[i]:subscribe(setLatest(i), util.noop, util.noop)
-            end
-
-            subscriptions[#sources + 1] = self:subscribe(onNext, onError, onCompleted)
-            return Subscription.create(
-                function()
-                    for i = 1, #sources + 1 do
-                        if subscriptions[i] then
-                            subscriptions[i]:unsubscribe()
-                        end
-                    end
-                end
-            )
         end
-    )
+
+        local function onNext(value)
+            return observer:onNext(value, util.unpack(latest))
+        end
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        for i = 1, #sources do
+            subscriptions[i] = sources[i]:subscribe(setLatest(i), util.noop, util.noop)
+        end
+
+        subscriptions[#sources + 1] = self:subscribe(onNext, onError, onCompleted)
+        return Subscription.create(function()
+            for i = 1, #sources + 1 do
+                if subscriptions[i] then
+                    subscriptions[i]:unsubscribe()
+                end
+            end
+        end)
+    end)
 end
 
 --- Returns an Observable that merges the values produced by the source Observables by grouping them
@@ -2112,71 +1916,69 @@ function Observable.zip(...)
     local sources = util.pack(...)
     local count = #sources
 
-    return Observable.create(
-        function(observer)
-            local values = {}
-            local active = {}
-            local subscriptions = {}
-            for i = 1, count do
-                values[i] = {n = 0}
-                active[i] = true
-            end
-
-            local function onNext(i)
-                return function(value)
-                    table.insert(values[i], value)
-                    values[i].n = values[i].n + 1
-
-                    -- luacheck: ignore i
-                    local ready = true
-                    for i = 1, count do
-                        if values[i].n == 0 then
-                            ready = false
-                            break
-                        end
-                    end
-
-                    if ready then
-                        local payload = {}
-
-                        for i = 1, count do
-                            payload[i] = table.remove(values[i], 1)
-                            values[i].n = values[i].n - 1
-                        end
-
-                        observer:onNext(util.unpack(payload))
-                    end
-                end
-            end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted(i)
-                return function()
-                    active[i] = nil
-                    if not next(active) or values[i].n == 0 then
-                        return observer:onCompleted()
-                    end
-                end
-            end
-
-            for i = 1, count do
-                subscriptions[i] = sources[i]:subscribe(onNext(i), onError, onCompleted(i))
-            end
-
-            return Subscription.create(
-                function()
-                    for i = 1, count do
-                        if subscriptions[i] then
-                            subscriptions[i]:unsubscribe()
-                        end
-                    end
-                end
-            )
+    return Observable.create(function(observer)
+        local values = {}
+        local active = {}
+        local subscriptions = {}
+        for i = 1, count do
+            values[i] = {
+                n = 0,
+            }
+            active[i] = true
         end
-    )
+
+        local function onNext(i)
+            return function(value)
+                table.insert(values[i], value)
+                values[i].n = values[i].n + 1
+
+                -- luacheck: ignore i
+                local ready = true
+                for i = 1, count do
+                    if values[i].n == 0 then
+                        ready = false
+                        break
+                    end
+                end
+
+                if ready then
+                    local payload = {}
+
+                    for i = 1, count do
+                        payload[i] = table.remove(values[i], 1)
+                        values[i].n = values[i].n - 1
+                    end
+
+                    observer:onNext(util.unpack(payload))
+                end
+            end
+        end
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted(i)
+            return function()
+                active[i] = nil
+                if not next(active) or values[i].n == 0 then
+                    return observer:onCompleted()
+                end
+            end
+        end
+
+        for i = 1, count do
+            subscriptions[i] = sources[i]:subscribe(onNext(i), onError, onCompleted(i))
+        end
+
+        return Subscription.create(function()
+            for i = 1, count do
+                if subscriptions[i] then
+                    subscriptions[i]:unsubscribe()
+                end
+            end
+        end)
+    end)
 end
 
 --- @class ImmediateScheduler
@@ -2211,7 +2013,7 @@ CooperativeScheduler.__tostring = util.constant("CooperativeScheduler")
 function CooperativeScheduler.create(currentTime)
     local self = {
         tasks = {},
-        currentTime = currentTime or 0
+        currentTime = currentTime or 0,
     }
 
     return setmetatable(self, CooperativeScheduler)
@@ -2227,16 +2029,14 @@ end
 function CooperativeScheduler:schedule(action, delay)
     local task = {
         thread = coroutine.create(action),
-        due = self.currentTime + (delay or 0)
+        due = self.currentTime + (delay or 0),
     }
 
     table.insert(self.tasks, task)
 
-    return Subscription.create(
-        function()
-            return self:unschedule(task)
-        end
-    )
+    return Subscription.create(function()
+        return self:unschedule(task)
+    end)
 end
 
 function CooperativeScheduler:unschedule(task)
@@ -2303,11 +2103,9 @@ function TimeoutScheduler:schedule(action, delay, ...)
     local _ = self
     local timer = require "rx.timer"
     local handle = timer.setTimeout(delay, action, ...)
-    return Subscription.create(
-        function()
-            timer.clearTimeout(handle)
-        end
-    )
+    return Subscription.create(function()
+        timer.clearTimeout(handle)
+    end)
 end
 
 --- @class Subject
@@ -2323,7 +2121,7 @@ Subject.__tostring = util.constant("Subject")
 function Subject.create()
     local self = {
         observers = {},
-        stopped = false
+        stopped = false,
     }
 
     return setmetatable(self, Subject)
@@ -2345,16 +2143,14 @@ function Subject:subscribe(onNext, onError, onCompleted)
 
     table.insert(self.observers, observer)
 
-    return Subscription.create(
-        function()
-            for i = 1, #self.observers do
-                if self.observers[i] == observer then
-                    table.remove(self.observers, i)
-                    return
-                end
+    return Subscription.create(function()
+        for i = 1, #self.observers do
+            if self.observers[i] == observer then
+                table.remove(self.observers, i)
+                return
             end
         end
-    )
+    end)
 end
 
 --- Pushes zero or more values to the Subject. They will be broadcasted to all Observers.
@@ -2410,7 +2206,7 @@ AnonymousSubject.__tostring = util.constant("AnonymousSubject")
 function AnonymousSubject.create(_destination, _source)
     local self = {
         destination = _destination,
-        source = _source
+        source = _source,
     }
 
     return setmetatable(self, AnonymousSubject)
@@ -2470,7 +2266,7 @@ function AsyncSubject.create()
         observers = {},
         stopped = false,
         value = nil,
-        errorMessage = nil
+        errorMessage = nil,
     }
 
     return setmetatable(self, AsyncSubject)
@@ -2501,16 +2297,14 @@ function AsyncSubject:subscribe(onNext, onError, onCompleted)
 
     table.insert(self.observers, observer)
 
-    return Subscription.create(
-        function()
-            for i = 1, #self.observers do
-                if self.observers[i] == observer then
-                    table.remove(self.observers, i)
-                    return
-                end
+    return Subscription.create(function()
+        for i = 1, #self.observers do
+            if self.observers[i] == observer then
+                table.remove(self.observers, i)
+                return
             end
         end
-    )
+    end)
 end
 
 --- Pushes zero or more values to the AsyncSubject.
@@ -2565,7 +2359,7 @@ BehaviorSubject.__tostring = util.constant("BehaviorSubject")
 function BehaviorSubject.create(...)
     local self = {
         observers = {},
-        stopped = false
+        stopped = false,
     }
 
     if select("#", ...) > 0 then
@@ -2632,7 +2426,7 @@ function ReplaySubject.create(n)
         observers = {},
         stopped = false,
         buffer = {},
-        bufferSize = n
+        bufferSize = n,
     }
 
     return setmetatable(self, ReplaySubject)
@@ -2689,5 +2483,5 @@ return {
     AnonymousSubject = AnonymousSubject,
     AsyncSubject = AsyncSubject,
     BehaviorSubject = BehaviorSubject,
-    ReplaySubject = ReplaySubject
+    ReplaySubject = ReplaySubject,
 }

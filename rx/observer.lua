@@ -16,7 +16,7 @@ function Observer.create(onNext, onError, onCompleted)
         _onNext = onNext or util.noop,
         _onError = onError or error,
         _onCompleted = onCompleted or util.noop,
-        stopped = false
+        stopped = false,
     }
 
     return setmetatable(self, Observer)

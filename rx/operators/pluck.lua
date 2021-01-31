@@ -14,21 +14,19 @@ function Observable:pluck(key, ...)
         return Observable.throw("pluck key must be a string")
     end
 
-    return Observable.create(
-        function(observer)
-            local function onNext(t)
-                return observer:onNext(t[key])
-            end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
+    return Observable.create(function(observer)
+        local function onNext(t)
+            return observer:onNext(t[key])
         end
-    ):pluck(...)
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end):pluck(...)
 end

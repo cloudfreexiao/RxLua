@@ -14,7 +14,7 @@ CooperativeScheduler.__tostring = util.constant("CooperativeScheduler")
 function CooperativeScheduler.create(currentTime)
     local self = {
         tasks = {},
-        currentTime = currentTime or 0
+        currentTime = currentTime or 0,
     }
 
     return setmetatable(self, CooperativeScheduler)
@@ -30,16 +30,14 @@ end
 function CooperativeScheduler:schedule(action, delay)
     local task = {
         thread = coroutine.create(action),
-        due = self.currentTime + (delay or 0)
+        due = self.currentTime + (delay or 0),
     }
 
     table.insert(self.tasks, task)
 
-    return Subscription.create(
-        function()
-            return self:unschedule(task)
-        end
-    )
+    return Subscription.create(function()
+        return self:unschedule(task)
+    end)
 end
 
 function CooperativeScheduler:unschedule(task)

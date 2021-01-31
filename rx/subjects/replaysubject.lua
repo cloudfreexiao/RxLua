@@ -18,7 +18,7 @@ function ReplaySubject.create(n)
         observers = {},
         stopped = false,
         buffer = {},
-        bufferSize = n
+        bufferSize = n,
     }
 
     return setmetatable(self, ReplaySubject)

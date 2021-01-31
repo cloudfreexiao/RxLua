@@ -4,24 +4,22 @@ local Observable = require "rx.observable"
 -- return values and produces each value individually.
 -- @returns {Observable}
 function Observable:unwrap()
-    return Observable.create(
-        function(observer)
-            local function onNext(...)
-                local values = {...}
-                for i = 1, #values do
-                    observer:onNext(values[i])
-                end
+    return Observable.create(function(observer)
+        local function onNext(...)
+            local values = {...}
+            for i = 1, #values do
+                observer:onNext(values[i])
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end

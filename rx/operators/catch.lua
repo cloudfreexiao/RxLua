@@ -7,35 +7,39 @@ local util = require 'rx.util'
 --                                      replace the source Observable in the event of an error.
 -- @returns {Observable}
 function Observable:catch(handler)
-  handler = handler and (type(handler) == 'function' and handler or util.constant(handler))
+    handler = handler and (type(handler) == 'function' and handler or util.constant(handler))
 
-  return Observable.create(function(observer)
-    local subscription
+    return Observable.create(function(observer)
+        local subscription
 
-    local function onNext(...)
-      return observer:onNext(...)
-    end
+        local function onNext(...)
+            return observer:onNext(...)
+        end
 
-    local function onError(e)
-      if not handler then
-        if subscription then subscription:unsubscribe() end
-        return observer:onCompleted()
-      end
+        local function onError(e)
+            if not handler then
+                if subscription then
+                    subscription:unsubscribe()
+                end
+                return observer:onCompleted()
+            end
 
-      local success, _continue = pcall(handler, e)
-      if success and _continue then
-        if subscription then subscription:unsubscribe() end
-        _continue:subscribe(observer)
-      else
-        observer:onError(success and e or _continue)
-      end
-    end
+            local success, _continue = pcall(handler, e)
+            if success and _continue then
+                if subscription then
+                    subscription:unsubscribe()
+                end
+                _continue:subscribe(observer)
+            else
+                observer:onError(success and e or _continue)
+            end
+        end
 
-    local function onCompleted()
-      observer:onCompleted()
-    end
+        local function onCompleted()
+            observer:onCompleted()
+        end
 
-    subscription = self:subscribe(onNext, onError, onCompleted)
-    return subscription
-  end)
+        subscription = self:subscribe(onNext, onError, onCompleted)
+        return subscription
+    end)
 end

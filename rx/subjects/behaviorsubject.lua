@@ -15,7 +15,7 @@ BehaviorSubject.__tostring = util.constant("BehaviorSubject")
 function BehaviorSubject.create(...)
     local self = {
         observers = {},
-        stopped = false
+        stopped = false,
     }
 
     if select("#", ...) > 0 then

@@ -10,36 +10,30 @@ local util = require "rx.util"
 -- @arg {*} seed - A value to pass to the accumulator the first time it is run.
 -- @returns {Observable}
 function Observable:scan(accumulator, seed)
-    return Observable.create(
-        function(observer)
-            local result = seed
-            local first = true
+    return Observable.create(function(observer)
+        local result = seed
+        local first = true
 
-            local function onNext(...)
-                if first and seed == nil then
-                    result = ...
-                    first = false
-                else
-                    return util.tryWithObserver(
-                        observer,
-                        function(...)
-                            result = accumulator(result, ...)
-                            observer:onNext(result)
-                        end,
-                        ...
-                    )
-                end
+        local function onNext(...)
+            if first and seed == nil then
+                result = ...
+                first = false
+            else
+                return util.tryWithObserver(observer, function(...)
+                    result = accumulator(result, ...)
+                    observer:onNext(result)
+                end, ...)
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end

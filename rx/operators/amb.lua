@@ -9,61 +9,57 @@ function Observable.amb(a, b, ...)
         return a
     end
 
-    return Observable.create(
-        function(observer)
-            local subscriptionA, subscriptionB
+    return Observable.create(function(observer)
+        local subscriptionA, subscriptionB
 
-            local function onNextA(...)
-                if subscriptionB then
-                    subscriptionB:unsubscribe()
-                end
-                observer:onNext(...)
+        local function onNextA(...)
+            if subscriptionB then
+                subscriptionB:unsubscribe()
             end
-
-            local function onErrorA(e)
-                if subscriptionB then
-                    subscriptionB:unsubscribe()
-                end
-                observer:onError(e)
-            end
-
-            local function onCompletedA()
-                if subscriptionB then
-                    subscriptionB:unsubscribe()
-                end
-                observer:onCompleted()
-            end
-
-            local function onNextB(...)
-                if subscriptionA then
-                    subscriptionA:unsubscribe()
-                end
-                observer:onNext(...)
-            end
-
-            local function onErrorB(e)
-                if subscriptionA then
-                    subscriptionA:unsubscribe()
-                end
-                observer:onError(e)
-            end
-
-            local function onCompletedB()
-                if subscriptionA then
-                    subscriptionA:unsubscribe()
-                end
-                observer:onCompleted()
-            end
-
-            subscriptionA = a:subscribe(onNextA, onErrorA, onCompletedA)
-            subscriptionB = b:subscribe(onNextB, onErrorB, onCompletedB)
-
-            return Subscription.create(
-                function()
-                    subscriptionA:unsubscribe()
-                    subscriptionB:unsubscribe()
-                end
-            )
+            observer:onNext(...)
         end
-    ):amb(...)
+
+        local function onErrorA(e)
+            if subscriptionB then
+                subscriptionB:unsubscribe()
+            end
+            observer:onError(e)
+        end
+
+        local function onCompletedA()
+            if subscriptionB then
+                subscriptionB:unsubscribe()
+            end
+            observer:onCompleted()
+        end
+
+        local function onNextB(...)
+            if subscriptionA then
+                subscriptionA:unsubscribe()
+            end
+            observer:onNext(...)
+        end
+
+        local function onErrorB(e)
+            if subscriptionA then
+                subscriptionA:unsubscribe()
+            end
+            observer:onError(e)
+        end
+
+        local function onCompletedB()
+            if subscriptionA then
+                subscriptionA:unsubscribe()
+            end
+            observer:onCompleted()
+        end
+
+        subscriptionA = a:subscribe(onNextA, onErrorA, onCompletedA)
+        subscriptionB = b:subscribe(onNextB, onErrorB, onCompletedB)
+
+        return Subscription.create(function()
+            subscriptionA:unsubscribe()
+            subscriptionB:unsubscribe()
+        end)
+    end):amb(...)
 end

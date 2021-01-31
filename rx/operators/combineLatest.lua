@@ -20,56 +20,49 @@ function Observable:combineLatest(...)
     end
     table.insert(sources, 1, self)
 
-    return Observable.create(
-        function(observer)
-            local latest = {}
-            local pending = {util.unpack(sources)}
-            local completed = {}
-            local subscription = {}
+    return Observable.create(function(observer)
+        local latest = {}
+        local pending = {util.unpack(sources)}
+        local completed = {}
+        local subscription = {}
 
-            local function onNext(i)
-                return function(value)
-                    latest[i] = value
-                    pending[i] = nil
+        local function onNext(i)
+            return function(value)
+                latest[i] = value
+                pending[i] = nil
 
-                    if not next(pending) then
-                        util.tryWithObserver(
-                            observer,
-                            function()
-                                observer:onNext(combinator(util.unpack(latest)))
-                            end
-                        )
-                    end
+                if not next(pending) then
+                    util.tryWithObserver(observer, function()
+                        observer:onNext(combinator(util.unpack(latest)))
+                    end)
                 end
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted(i)
-                return function()
-                    table.insert(completed, i)
-
-                    if #completed == #sources then
-                        observer:onCompleted()
-                    end
-                end
-            end
-
-            for i = 1, #sources do
-                subscription[i] = sources[i]:subscribe(onNext(i), onError, onCompleted(i))
-            end
-
-            return Subscription.create(
-                function()
-                    for i = 1, #sources do
-                        if subscription[i] then
-                            subscription[i]:unsubscribe()
-                        end
-                    end
-                end
-            )
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted(i)
+            return function()
+                table.insert(completed, i)
+
+                if #completed == #sources then
+                    observer:onCompleted()
+                end
+            end
+        end
+
+        for i = 1, #sources do
+            subscription[i] = sources[i]:subscribe(onNext(i), onError, onCompleted(i))
+        end
+
+        return Subscription.create(function()
+            for i = 1, #sources do
+                if subscription[i] then
+                    subscription[i]:unsubscribe()
+                end
+            end
+        end)
+    end)
 end

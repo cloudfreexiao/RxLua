@@ -8,10 +8,8 @@ local util = require "rx.util"
 -- @returns {Observable}
 function Observable:startWith(...)
     local values = util.pack(...)
-    return Observable.create(
-        function(observer)
-            observer:onNext(util.unpack(values))
-            return self:subscribe(observer)
-        end
-    )
+    return Observable.create(function(observer)
+        observer:onNext(util.unpack(values))
+        return self:subscribe(observer)
+    end)
 end

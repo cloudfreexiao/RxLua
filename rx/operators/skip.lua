@@ -7,27 +7,25 @@ local Observable = require "rx.observable"
 function Observable:skip(n)
     n = n or 1
 
-    return Observable.create(
-        function(observer)
-            local i = 1
+    return Observable.create(function(observer)
+        local i = 1
 
-            local function onNext(...)
-                if i > n then
-                    observer:onNext(...)
-                else
-                    i = i + 1
-                end
+        local function onNext(...)
+            if i > n then
+                observer:onNext(...)
+            else
+                i = i + 1
             end
-
-            local function onError(e)
-                return observer:onError(e)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(e)
+            return observer:onError(e)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end

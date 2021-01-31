@@ -10,28 +10,26 @@ function Observable:window(size)
         error("Expected a number")
     end
 
-    return Observable.create(
-        function(observer)
-            local window = {}
+    return Observable.create(function(observer)
+        local window = {}
 
-            local function onNext(value)
-                table.insert(window, value)
+        local function onNext(value)
+            table.insert(window, value)
 
-                if #window >= size then
-                    observer:onNext(util.unpack(window))
-                    table.remove(window, 1)
-                end
+            if #window >= size then
+                observer:onNext(util.unpack(window))
+                table.remove(window, 1)
             end
-
-            local function onError(message)
-                return observer:onError(message)
-            end
-
-            local function onCompleted()
-                return observer:onCompleted()
-            end
-
-            return self:subscribe(onNext, onError, onCompleted)
         end
-    )
+
+        local function onError(message)
+            return observer:onError(message)
+        end
+
+        local function onCompleted()
+            return observer:onCompleted()
+        end
+
+        return self:subscribe(onNext, onError, onCompleted)
+    end)
 end
